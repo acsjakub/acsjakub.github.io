@@ -8,12 +8,12 @@ tags: gdb qemu soj assembly school
 
 For BI-SOJ course in school, I needed to setup debugging for running Boot sectors on Qemu in Real Mode. Soon, I realised it wasn’t going to be as straightforward and simple as I originally thought. Thus, after I spent some time reasearching, I decided to put together a simple tutorial to save some time in future.
 
-Please note that this tutorial merely puts together work of other authors. Splendid `.gdbinit` by https://ternet.fr/gdb_real_mode.html and `target.xml` found at https://gist.githubusercontent.com/MatanShahar/1441433e19637cf1bb46b1aa38a90815/raw/2687fb5daf60cf6aa8435efc8450d89f1ccf2205/target.xml.
+Please note that this tutorial merely puts together work of other authors. Splendid `.gdbinit` by [https://ternet.fr/gdb_real_mode.html](https://ternet.fr/gdb_real_mode.html) and `target.xml` found [here](https://gist.githubusercontent.com/MatanShahar/1441433e19637cf1bb46b1aa38a90815/raw/2687fb5daf60cf6aa8435efc8450d89f1ccf2205etarget.xml).
 <!--more-->
 
 ## TL;DR
 
-download `[target.xml](https://gist.githubusercontent.com/MatanShahar/1441433e19637cf1bb46b1aa38a90815/raw/2687fb5daf60cf6aa8435efc8450d89f1ccf2205/target.xml)`,`[.gdbinit](https://github.com/mhugo/gdb_init_real_mode)` and save them to the folder used to launch `gdb`.
+download [`target.xml`](https://gist.githubusercontent.com/MatanShahar/1441433e19637cf1bb46b1aa38a90815/raw/2687fb5daf60cf6aa8435efc8450d89f1ccf2205/target.xml),[`.gdbinit`](https://github.com/mhugo/gdb_init_real_mode) and save them to the folder used to launch `gdb`.
 
 ## Step By Step
 
@@ -81,5 +81,6 @@ Since gdb doesn’t support real mode by default (segmentation is ignored, ..), 
 Putting this whole debugging procedure together took me like a day and I thought someone might find it useful. Have fun!
 
 ## References:
-https://ternet.fr/gdb_real_mode.html - used this gdb init and
-https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Descriptions.html - target description reference
+[https://ternet.fr/gdb_real_mode.html](https://ternet.fr/gdb_real_mode.html)
+
+[https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Descriptions.html](https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Descriptions.html) - target description reference
