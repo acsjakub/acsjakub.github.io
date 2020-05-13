@@ -8,7 +8,7 @@ tags: gdb qemu soj assembly school
 
 For BI-SOJ course in school, I needed to setup debugging for running Boot sectors on Qemu in Real Mode. Soon, I realised it wasn’t going to be as straightforward and simple as I originally thought. Thus, after I spent some time reasearching, I decided to put together a simple tutorial to save some time in future.
 
-Please note that this tutorial merely puts together work of other authors. Splendid `.gdbinit` by [https://ternet.fr/gdb_real_mode.html](https://ternet.fr/gdb_real_mode.html) and `target.xml` found [here](https://gist.githubusercontent.com/MatanShahar/1441433e19637cf1bb46b1aa38a90815/raw/2687fb5daf60cf6aa8435efc8450d89f1ccf2205etarget.xml).
+Please note that this tutorial merely puts together work of other authors. Splendid `.gdbinit` by [https://ternet.fr/gdb_real_mode.html](https://ternet.fr/gdb_real_mode.html) and `target.xml` found [here](https://gist.githubusercontent.com/MatanShahar/1441433e19637cf1bb46b1aa38a90815/raw/2687fb5daf60cf6aa8435efc8450d89f1ccf2205/target.xml).
 <!--more-->
 
 ## TL;DR
